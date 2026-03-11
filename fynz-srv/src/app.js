@@ -7,17 +7,21 @@ import { registerRoutes } from './routes/index.js';
 
 dotenv.config();
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 const fastify = Fastify({
   logger: {
-    level: 'warn',
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        translateTime: 'HH:MM:ss',
-        ignore: 'pid,hostname',
-        colorize: true,
+    level: isDev ? 'warn' : 'info',
+    ...(isDev && {
+      transport: {
+        target: 'pino-pretty',
+        options: {
+          translateTime: 'HH:MM:ss',
+          ignore: 'pid,hostname',
+          colorize: true,
+        },
       },
-    },
+    }),
   },
 });
 
