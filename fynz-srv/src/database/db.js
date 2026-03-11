@@ -1,10 +1,13 @@
-import { Kysely, SqliteDialect } from 'kysely';
-import Database from 'better-sqlite3';
+import { Kysely, PostgresDialect } from 'kysely';
+import pg from 'pg';
 
-const DB_PATH = process.env.DB_PATH || 'fynz.db';
+const { Pool } = pg;
 
-const dialect = new SqliteDialect({
-  database: new Database(DB_PATH),
+const dialect = new PostgresDialect({
+  pool: new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 10,
+  }),
 });
 
 export const db = new Kysely({

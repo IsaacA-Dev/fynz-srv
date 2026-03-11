@@ -29,7 +29,7 @@ export class TransactionsService {
                 .where('id', '=', category_id)
                 .where((eb) =>
                     eb.or([
-                        eb('is_default', '=', 1),
+                        eb('is_default', '=', true),
                         eb('user_id', '=', userId),
                     ])
                 )
@@ -54,18 +54,12 @@ export class TransactionsService {
                 pocket_id: pocket_id || null,
                 category_id: category_id || null,
                 user_id: userId,
-                date: date || undefined, // Si no se pasa, usa CURRENT_TIMESTAMP
+                date: date || undefined, // Si no se pasa, usa NOW()
             })
-            .executeTakeFirst();
+            .returning(['id', 'amount', 'description', 'type', 'pocket_id', 'category_id'])
+            .executeTakeFirstOrThrow();
 
-        return {
-            id: Number(result.insertId),
-            amount,
-            description,
-            type,
-            pocket_id: pocket_id || null,
-            category_id: category_id || null,
-        };
+        return result;
     }
 
     /**
@@ -192,7 +186,7 @@ export class TransactionsService {
             ])
             .where('transactions.user_id', '=', userId)
             .where('transactions.type', '=', 'expense')
-            .groupBy('transactions.category_id')
+            .groupBy(['categories.id', 'categories.name', 'categories.icon', 'categories.color'])
             .orderBy('total', 'desc')
             .execute();
 

@@ -38,13 +38,10 @@ export class UsersService {
                 username,
                 password_hash: passwordHash,
             })
-            .executeTakeFirst();
+            .returning(['id', 'email', 'username'])
+            .executeTakeFirstOrThrow();
 
-        return {
-            id: Number(result.insertId),
-            email,
-            username,
-        };
+        return result;
     }
 
     /**

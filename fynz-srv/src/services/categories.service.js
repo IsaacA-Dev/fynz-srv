@@ -13,7 +13,7 @@ export class CategoriesService {
             .selectAll()
             .where((eb) =>
                 eb.or([
-                    eb('is_default', '=', 1),
+                    eb('is_default', '=', true),
                     eb('user_id', '=', userId),
                 ])
             )
@@ -33,7 +33,7 @@ export class CategoriesService {
                     eb('name', '=', name),
                     eb.or([
                         eb('user_id', '=', userId),
-                        eb('is_default', '=', 1),
+                        eb('is_default', '=', true),
                     ]),
                 ])
             )
@@ -50,16 +50,12 @@ export class CategoriesService {
                 icon: icon || null,
                 color: color || '#3b82f6',
                 user_id: userId,
-                is_default: 0,
+                is_default: false,
             })
-            .executeTakeFirst();
+            .returning(['id', 'name', 'icon', 'color'])
+            .executeTakeFirstOrThrow();
 
-        return {
-            id: Number(result.insertId),
-            name,
-            icon: icon || null,
-            color: color || '#3b82f6',
-        };
+        return result;
     }
 
     /**
@@ -76,7 +72,7 @@ export class CategoriesService {
             throw new AppError('Categoría no encontrada', 404);
         }
 
-        if (category.is_default === 1) {
+        if (category.is_default === true) {
             throw new AppError('No puedes editar categorías del sistema', 403);
         }
 
@@ -105,7 +101,7 @@ export class CategoriesService {
             throw new AppError('Categoría no encontrada', 404);
         }
 
-        if (category.is_default === 1) {
+        if (category.is_default === true) {
             throw new AppError('No puedes eliminar categorías del sistema', 403);
         }
 

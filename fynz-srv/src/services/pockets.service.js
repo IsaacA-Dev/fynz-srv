@@ -69,14 +69,11 @@ export class PocketsService {
                 icon: icon || null,
                 user_id: userId,
             })
-            .executeTakeFirst();
+            .returning(['id', 'name', 'target_amount', 'color', 'icon'])
+            .executeTakeFirstOrThrow();
 
         return {
-            id: Number(result.insertId),
-            name,
-            target_amount: target_amount || 0,
-            color: color || '#3b82f6',
-            icon: icon || null,
+            ...result,
             current_amount: 0,
             progress: 0,
         };
