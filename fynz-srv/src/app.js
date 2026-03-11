@@ -10,6 +10,8 @@ dotenv.config();
 const isDev = process.env.NODE_ENV !== 'production';
 
 const fastify = Fastify({
+  ignoreTrailingSlash: true,
+  ignoreDuplicateSlashes: true,
   logger: {
     level: isDev ? 'warn' : 'info',
     ...(isDev && {
