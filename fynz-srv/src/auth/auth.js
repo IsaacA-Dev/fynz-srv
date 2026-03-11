@@ -8,6 +8,7 @@ export function generateToken(user) {
     {
       id: user.id,
       email: user.email,
+      role: user.role,
     },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
@@ -50,4 +51,17 @@ export async function authMiddleware(request, reply) {
   }
 
   request.user = decoded;
+}
+
+/**
+ * Middleware para verificar si el usuario es administrador.
+ * Debe usarse después de authMiddleware.
+ */
+export async function adminMiddleware(request, reply) {
+  if (request.user.role !== 'admin') {
+    return reply.code(403).send({
+      success: false,
+      message: 'Privilegios de administrador requeridos',
+    });
+  }
 }

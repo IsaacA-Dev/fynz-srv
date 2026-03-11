@@ -8,9 +8,20 @@ export async function initDatabase() {
     .addColumn('username', 'varchar', (col) => col.unique().notNull())
     .addColumn('email', 'varchar', (col) => col.unique().notNull())
     .addColumn('password_hash', 'varchar', (col) => col.notNull())
+    .addColumn('role', 'varchar', (col) => col.defaultTo('user').notNull())
     .addColumn('created_at', 'timestamp', (col) => col.defaultTo(sql`NOW()`))
     .addColumn('updated_at', 'timestamp', (col) => col.defaultTo(sql`NOW()`))
     .execute();
+
+  // Asegurar que la columna 'role' existe si la tabla ya fue creada
+  try {
+    await db.schema.alterTable('users')
+      .addColumn('role', 'varchar', (col) => col.defaultTo('user').notNull())
+      .execute();
+    console.log('✅ Columna "role" añadida a la tabla users');
+  } catch (err) {
+    // Si ya existe, fallará y lo ignoramos
+  }
 
   // ─── 2. CATEGORIES ────────────────────────────────────────
   // user_id nullable: null = categoría global del sistema
@@ -103,6 +114,22 @@ export async function initDatabase() {
       .execute();
 
     console.log('📦 Categorías por defecto insertadas');
+  }
+
+  // ─── PROMOCIÓN DE ADMIN ──────────────────────────────────
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (adminEmail) {
+    const adminUser = await db.selectFrom('users')
+      .where('email', '=', adminEmail)
+      .executeTakeFirst();
+    
+    if (adminUser && adminUser.role !== 'admin') {
+      await db.updateTable('users')
+        .set({ role: 'admin' })
+        .where('email', '=', adminEmail)
+        .execute();
+      console.log(`👑 Usuario ${adminEmail} promovido a Administrador`);
+    }
   }
 
   console.log('✅ Base de datos Fynz inicializada correctamente');
