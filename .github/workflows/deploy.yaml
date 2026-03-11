@@ -17,5 +17,17 @@ jobs:
     steps:
       - name: Trigger Render Deploy
         run: |
-          curl -s "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
-          echo "✅ Deploy triggered on Render"
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            echo "❌ Error: RENDER_DEPLOY_HOOK_URL no está configurado en los Secrets de GitHub."
+            exit 1
+          fi
+          
+          # Hacemos el curl y verificamos el status code de HTTP
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
+          
+          if [ "$RESPONSE" -eq 200 ] || [ "$RESPONSE" -eq 201 ] || [ "$RESPONSE" -eq 202 ]; then
+            echo "✅ Deploy triggered successfully on Render (HTTP $RESPONSE)"
+          else
+            echo "❌ Render respondió con error (HTTP $RESPONSE). Revisa tu Deploy Hook URL."
+            exit 1
+          fi
