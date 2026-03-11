@@ -28,7 +28,7 @@ const fastify = Fastify({
 });
 
 // ─── Plugins ────────────────────────────────────────────
-await fastify.register(corsPlugin);
+await corsPlugin(fastify);
 fastify.register(errorHandlerPlugin);
 
 // ─── Base de datos ──────────────────────────────────────
