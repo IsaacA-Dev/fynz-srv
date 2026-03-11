@@ -1,0 +1,167 @@
+# ─────────────────────────────────────────────
+# Paths: Pockets
+# CRUD de bolsillos de ahorro
+# Requieren JWT (Bearer token)
+#
+# Archivo de referencia por modelo.
+# La spec completa está en: ../openapi.yaml
+# ─────────────────────────────────────────────
+
+# GET /api/pockets
+list:
+  get:
+    tags: [Bolsillos]
+    summary: Listar bolsillos del usuario
+    description: |
+      Devuelve todos los bolsillos con:
+      - current_amount: saldo calculado dinámicamente
+      - progress: porcentaje de avance hacia la meta
+      Ordenados por fecha (más recientes primero).
+    operationId: listPockets
+    responses:
+      "200":
+        description: Lista de bolsillos con saldos calculados
+        content:
+          application/json:
+            example:
+              success: true
+              data:
+                - id: 1
+                  name: "Vacaciones Cancún"
+                  target_amount: 25000.00
+                  current_amount: 8500.00
+                  color: "#3b82f6"
+                  icon: "🏖️"
+                  progress: 34.0
+                  user_id: 1
+                  created_at: "2026-03-10T23:00:00.000Z"
+
+# GET /api/pockets/:id
+getById:
+  get:
+    tags: [Bolsillos]
+    summary: Obtener un bolsillo por ID
+    description: Detalle de un bolsillo con saldo y progreso calculados.
+    operationId: getPocketById
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 1
+    responses:
+      "200":
+        description: Detalle del bolsillo
+        content:
+          application/json:
+            example:
+              success: true
+              data:
+                id: 1
+                name: "Vacaciones Cancún"
+                target_amount: 25000.00
+                current_amount: 8500.00
+                color: "#3b82f6"
+                icon: "🏖️"
+                progress: 34.0
+      "404":
+        description: Bolsillo no encontrado
+
+# POST /api/pockets
+create:
+  post:
+    tags: [Bolsillos]
+    summary: Crear nuevo bolsillo
+    description: |
+      Crea un bolsillo de ahorro. Saldo inicial = 0.
+      Se incrementa con transacciones tipo 'transfer'.
+    operationId: createPocket
+    requestBody:
+      required: true
+      content:
+        application/json:
+          examples:
+            con_meta:
+              summary: Con meta de ahorro
+              value:
+                name: "Auto nuevo"
+                target_amount: 180000.00
+                color: "#f59e0b"
+                icon: "🚗"
+            basico:
+              summary: Sin meta
+              value:
+                name: "Gastos compartidos"
+    responses:
+      "201":
+        description: Bolsillo creado
+        content:
+          application/json:
+            example:
+              success: true
+              message: "Bolsillo creado"
+              data:
+                id: 1
+                name: "Auto nuevo"
+                target_amount: 180000.00
+                current_amount: 0
+                progress: 0
+
+# PUT /api/pockets/:id
+update:
+  put:
+    tags: [Bolsillos]
+    summary: Actualizar bolsillo
+    description: Actualiza datos del bolsillo. No modifica transacciones asociadas.
+    operationId: updatePocket
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 1
+    requestBody:
+      required: true
+      content:
+        application/json:
+          example:
+            name: "Vacaciones Europa 2027"
+            target_amount: 60000.00
+    responses:
+      "200":
+        description: Bolsillo actualizado
+        content:
+          application/json:
+            example:
+              success: true
+              message: "Bolsillo actualizado"
+      "404":
+        description: Bolsillo no encontrado
+
+# DELETE /api/pockets/:id
+delete:
+  delete:
+    tags: [Bolsillos]
+    summary: Eliminar bolsillo
+    description: |
+      Elimina un bolsillo. Transacciones asociadas quedan con pocket_id = NULL.
+    operationId: deletePocket
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 1
+    responses:
+      "200":
+        description: Bolsillo eliminado
+        content:
+          application/json:
+            example:
+              success: true
+              message: "Bolsillo eliminado"
+      "404":
+        description: Bolsillo no encontrado

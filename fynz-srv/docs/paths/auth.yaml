@@ -1,0 +1,127 @@
+# ─────────────────────────────────────────────
+# Paths: Auth
+# Endpoints de autenticación (registro y login)
+# No requieren token JWT
+#
+# Archivo de referencia por modelo.
+# La spec completa está en: ../openapi.yaml
+# ─────────────────────────────────────────────
+
+# POST /api/auth/register
+register:
+  post:
+    tags: [Autenticación]
+    summary: Registrar nuevo usuario
+    description: |
+      Crea una cuenta nueva en Fynz. El email y username deben ser únicos.
+      El email se convierte automáticamente a minúsculas.
+      La contraseña se hashea con bcrypt antes de almacenarse.
+    operationId: registerUser
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+                format: email
+                example: "isaac@fynz.app"
+              username:
+                type: string
+                minLength: 3
+                maxLength: 20
+                example: "isaac"
+              password:
+                type: string
+                format: password
+                minLength: 8
+                example: "miPassword123"
+            required: [email, username, password]
+    responses:
+      "201":
+        description: Usuario creado exitosamente
+        content:
+          application/json:
+            example:
+              success: true
+              message: "Usuario creado con éxito"
+              data:
+                id: 1
+                email: "isaac@fynz.app"
+                username: "isaac"
+      "400":
+        description: Datos de registro inválidos (validación Zod)
+        content:
+          application/json:
+            example:
+              success: false
+              message: "Datos de registro inválidos"
+              errors:
+                email:
+                  _errors: ["Email inválido"]
+      "409":
+        description: Email o username ya registrados
+        content:
+          application/json:
+            example:
+              success: false
+              message: "El email ya está registrado"
+
+# POST /api/auth/login
+login:
+  post:
+    tags: [Autenticación]
+    summary: Iniciar sesión
+    description: |
+      Autentica al usuario con email y contraseña.
+      Devuelve un JWT token con expiración de 1 día (configurable).
+      El token debe enviarse en el header `Authorization: Bearer <token>`.
+    operationId: loginUser
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+                format: email
+                example: "isaac@fynz.app"
+              password:
+                type: string
+                format: password
+                example: "miPassword123"
+            required: [email, password]
+    responses:
+      "200":
+        description: Login exitoso
+        content:
+          application/json:
+            example:
+              success: true
+              message: "Login correcto"
+              data:
+                token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                user:
+                  id: 1
+                  email: "isaac@fynz.app"
+                  username: "isaac"
+      "400":
+        description: Formato de datos incorrecto
+        content:
+          application/json:
+            example:
+              success: false
+              message: "Formato de datos incorrecto"
+      "401":
+        description: Credenciales inválidas
+        content:
+          application/json:
+            example:
+              success: false
+              message: "Credenciales inválidas"

@@ -1,0 +1,21 @@
+# ═══════════════════════════════════════════════════════════════
+# Fynz API — Deploy a Render.com
+# Se ejecuta en cada push a main
+# Requiere el secret RENDER_DEPLOY_HOOK_URL configurado en GitHub
+# ═══════════════════════════════════════════════════════════════
+
+name: Deploy API to Render
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render Deploy
+        run: |
+          curl -s "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+          echo "✅ Deploy triggered on Render"

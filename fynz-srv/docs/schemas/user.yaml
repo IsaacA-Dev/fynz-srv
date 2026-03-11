@@ -1,0 +1,123 @@
+# ─────────────────────────────────────────────
+# Schema: User
+# Modelo de usuario del sistema Fynz
+# ─────────────────────────────────────────────
+
+User:
+  type: object
+  description: Representación de un usuario registrado en Fynz
+  properties:
+    id:
+      type: integer
+      description: Identificador único del usuario
+      example: 1
+    username:
+      type: string
+      description: Nombre de usuario único
+      minLength: 3
+      maxLength: 20
+      example: "isaac"
+    email:
+      type: string
+      format: email
+      description: Correo electrónico único del usuario
+      example: "isaac@fynz.app"
+    created_at:
+      type: string
+      format: date-time
+      description: Fecha de creación de la cuenta
+      example: "2026-03-10T23:00:00.000Z"
+    updated_at:
+      type: string
+      format: date-time
+      description: Última actualización del perfil
+      example: "2026-03-10T23:00:00.000Z"
+  required:
+    - id
+    - username
+    - email
+
+UserProfile:
+  type: object
+  description: Perfil del usuario autenticado con balance calculado dinámicamente
+  allOf:
+    - $ref: "#/User"
+    - type: object
+      properties:
+        balance:
+          type: number
+          format: double
+          description: >
+            Balance general del usuario calculado dinámicamente.
+            Fórmula: SUM(income) - SUM(expense) - SUM(transfer)
+          example: 14570.00
+
+UserPublic:
+  type: object
+  description: Datos públicos del usuario (sin información sensible)
+  properties:
+    id:
+      type: integer
+      example: 1
+    email:
+      type: string
+      format: email
+      example: "isaac@fynz.app"
+    username:
+      type: string
+      example: "isaac"
+
+# ─── Request Bodies ────────────────────────────
+
+RegisterRequest:
+  type: object
+  description: Datos requeridos para registrar un nuevo usuario
+  properties:
+    email:
+      type: string
+      format: email
+      description: Correo electrónico (se convierte a minúsculas y se trimea)
+      example: "isaac@fynz.app"
+    username:
+      type: string
+      description: Nombre de usuario (3-20 caracteres)
+      minLength: 3
+      maxLength: 20
+      example: "isaac"
+    password:
+      type: string
+      format: password
+      description: Contraseña (mínimo 8 caracteres)
+      minLength: 8
+      example: "miPassword123"
+  required:
+    - email
+    - username
+    - password
+
+LoginRequest:
+  type: object
+  description: Credenciales para iniciar sesión
+  properties:
+    email:
+      type: string
+      format: email
+      example: "isaac@fynz.app"
+    password:
+      type: string
+      format: password
+      example: "miPassword123"
+  required:
+    - email
+    - password
+
+LoginResponse:
+  type: object
+  description: Respuesta exitosa del login
+  properties:
+    token:
+      type: string
+      description: JWT token para autenticación en endpoints protegidos
+      example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    user:
+      $ref: "#/UserPublic"

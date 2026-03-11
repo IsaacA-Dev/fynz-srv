@@ -1,0 +1,128 @@
+# ─────────────────────────────────────────────
+# Schema: Pocket
+# Modelo de bolsillos para organizar dinero por metas
+# ─────────────────────────────────────────────
+
+Pocket:
+  type: object
+  description: >
+    Bolsillo de ahorro. Permite al usuario organizar su dinero
+    en metas separadas (ej: Vacaciones, Emergencia, Auto nuevo).
+    El saldo actual (current_amount) se calcula dinámicamente
+    sumando las transacciones tipo 'transfer' asociadas.
+  properties:
+    id:
+      type: integer
+      description: Identificador único del bolsillo
+      example: 1
+    name:
+      type: string
+      description: Nombre del bolsillo
+      maxLength: 50
+      example: "Vacaciones Cancún"
+    target_amount:
+      type: number
+      format: double
+      description: Meta de ahorro en pesos
+      minimum: 0
+      example: 25000.00
+    current_amount:
+      type: number
+      format: double
+      description: >
+        Saldo actual del bolsillo. Calculado dinámicamente como
+        SUM(transactions.amount WHERE pocket_id = this.id AND type = 'transfer').
+        NO se almacena en la base de datos.
+      readOnly: true
+      example: 8500.00
+    color:
+      type: string
+      pattern: "^#[0-9a-fA-F]{6}$"
+      description: Color hexadecimal para la UI
+      example: "#3b82f6"
+    icon:
+      type: string
+      nullable: true
+      description: Emoji o identificador de ícono para la UI
+      example: "🏖️"
+    progress:
+      type: number
+      format: double
+      description: >
+        Porcentaje de progreso hacia la meta (0-100).
+        Calculado como (current_amount / target_amount) * 100.
+        Si target_amount es 0, el progreso es 0.
+      readOnly: true
+      minimum: 0
+      maximum: 100
+      example: 34.0
+    user_id:
+      type: integer
+      description: ID del usuario propietario
+      example: 1
+    created_at:
+      type: string
+      format: date-time
+      description: Fecha de creación del bolsillo
+      example: "2026-03-10T23:00:00.000Z"
+  required:
+    - id
+    - name
+    - user_id
+
+# ─── Request Bodies ────────────────────────────
+
+CreatePocketRequest:
+  type: object
+  description: Datos para crear un nuevo bolsillo
+  properties:
+    name:
+      type: string
+      description: Nombre del bolsillo (1-50 caracteres)
+      minLength: 1
+      maxLength: 50
+      example: "Fondo de Emergencia"
+    target_amount:
+      type: number
+      format: double
+      description: Meta de ahorro. Default 0 si no se envía
+      minimum: 0
+      default: 0
+      example: 50000.00
+    color:
+      type: string
+      pattern: "^#[0-9a-fA-F]{6}$"
+      description: Color hexadecimal para la UI
+      example: "#10b981"
+    icon:
+      type: string
+      description: Emoji o identificador de ícono
+      maxLength: 10
+      example: "🛡️"
+  required:
+    - name
+
+UpdatePocketRequest:
+  type: object
+  description: >
+    Datos para actualizar un bolsillo existente.
+    Se requiere al menos un campo.
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 50
+      example: "Fondo de Emergencia 2026"
+    target_amount:
+      type: number
+      format: double
+      minimum: 0
+      example: 75000.00
+    color:
+      type: string
+      pattern: "^#[0-9a-fA-F]{6}$"
+      example: "#059669"
+    icon:
+      type: string
+      maxLength: 10
+      example: "💰"

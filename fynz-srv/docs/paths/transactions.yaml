@@ -1,0 +1,265 @@
+# ─────────────────────────────────────────────
+# Paths: Transactions
+# CRUD + Resumen financiero
+# Requieren JWT (Bearer token)
+#
+# Archivo de referencia por modelo.
+# La spec completa está en: ../openapi.yaml
+# ─────────────────────────────────────────────
+
+# GET /api/transactions
+list:
+  get:
+    tags: [Transacciones]
+    summary: Listar transacciones con filtros y paginación
+    description: |
+      Filtros disponibles: type, category_id, pocket_id, from, to
+      Paginación: limit (1-100, default 50), offset (default 0)
+      Orden: fecha descendente (más recientes primero)
+    operationId: listTransactions
+    parameters:
+      - name: type
+        in: query
+        schema:
+          type: string
+          enum: [income, expense, transfer]
+      - name: category_id
+        in: query
+        schema:
+          type: integer
+      - name: pocket_id
+        in: query
+        schema:
+          type: integer
+      - name: from
+        in: query
+        description: "Fecha inicio (ISO 8601)"
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        description: "Fecha fin (ISO 8601)"
+        schema:
+          type: string
+          format: date-time
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - name: offset
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+    responses:
+      "200":
+        description: Lista paginada de transacciones
+        content:
+          application/json:
+            example:
+              success: true
+              data:
+                - id: 3
+                  amount: 180.00
+                  description: "Pizza con amigos"
+                  type: "expense"
+                  pocket_id: null
+                  category_id: 1
+                  user_id: 1
+                  date: "2026-03-10T20:00:00.000Z"
+              pagination:
+                total: 147
+                limit: 50
+                offset: 0
+
+# POST /api/transactions
+create:
+  post:
+    tags: [Transacciones]
+    summary: Registrar nueva transacción
+    description: |
+      Reglas de negocio:
+      - income: suma al balance general
+      - expense: resta del balance general
+      - transfer: resta del general, suma al pocket. Requiere pocket_id.
+
+      Validaciones:
+      - amount > 0
+      - pocket_id debe existir y pertenecer al usuario (si se envía)
+      - category_id debe ser accesible para el usuario (si se envía)
+      - Si type = 'transfer', pocket_id es obligatorio
+    operationId: createTransaction
+    requestBody:
+      required: true
+      content:
+        application/json:
+          examples:
+            ingreso:
+              summary: "💰 Ingreso (nómina)"
+              value:
+                amount: 15000.00
+                description: "Nómina quincenal"
+                type: "income"
+                category_id: 9
+            gasto:
+              summary: "💸 Gasto"
+              value:
+                amount: 250.00
+                description: "Uber al trabajo"
+                type: "expense"
+                category_id: 2
+            transferencia:
+              summary: "🏦 Transfer a bolsillo"
+              value:
+                amount: 3000.00
+                description: "Ahorro quincenal"
+                type: "transfer"
+                pocket_id: 1
+            gasto_con_fecha:
+              summary: "📅 Con fecha personalizada"
+              value:
+                amount: 180.00
+                description: "Pizza con amigos"
+                type: "expense"
+                category_id: 1
+                date: "2026-03-08T20:00:00.000Z"
+    responses:
+      "201":
+        description: Transacción registrada
+        content:
+          application/json:
+            example:
+              success: true
+              message: "Transacción registrada"
+              data:
+                id: 1
+                amount: 250.00
+                description: "Uber al trabajo"
+                type: "expense"
+                pocket_id: null
+                category_id: 2
+      "400":
+        description: Datos inválidos o transfer sin pocket_id
+        content:
+          application/json:
+            examples:
+              sin_pocket:
+                summary: Transfer sin pocket_id
+                value:
+                  success: false
+                  message: "Las transferencias requieren un bolsillo destino (pocket_id)"
+              tipo_invalido:
+                summary: Tipo inválido
+                value:
+                  success: false
+                  message: "Datos inválidos"
+                  errors:
+                    type:
+                      _errors: ["Tipo debe ser: income, expense o transfer"]
+      "404":
+        description: Pocket o categoría no encontrada
+        content:
+          application/json:
+            example:
+              success: false
+              message: "Bolsillo no encontrado o no te pertenece"
+
+# GET /api/transactions/summary
+summary:
+  get:
+    tags: [Transacciones]
+    summary: Obtener resumen financiero
+    description: |
+      Totales: income, expense, transfer, balance
+      Desglose: gastos por categoría (mayor a menor)
+      Ideal para el dashboard principal.
+    operationId: getTransactionSummary
+    responses:
+      "200":
+        description: Resumen financiero
+        content:
+          application/json:
+            example:
+              success: true
+              data:
+                income: 30000.00
+                expense: 12450.00
+                transfer: 5000.00
+                balance: 12550.00
+                expenses_by_category:
+                  - category_name: "Alimentación"
+                    category_icon: "🍔"
+                    category_color: "#ef4444"
+                    total: 4500.00
+                  - category_name: "Transporte"
+                    category_icon: "🚗"
+                    category_color: "#f59e0b"
+                    total: 3200.00
+                  - category_name: "Entretenimiento"
+                    category_icon: "🎬"
+                    category_color: "#8b5cf6"
+                    total: 2100.00
+
+# GET /api/transactions/:id
+getById:
+  get:
+    tags: [Transacciones]
+    summary: Obtener una transacción por ID
+    operationId: getTransactionById
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 1
+    responses:
+      "200":
+        description: Detalle de la transacción
+        content:
+          application/json:
+            example:
+              success: true
+              data:
+                id: 1
+                amount: 250.00
+                description: "Uber al trabajo"
+                type: "expense"
+                pocket_id: null
+                category_id: 2
+                user_id: 1
+                date: "2026-03-10T15:30:00.000Z"
+      "404":
+        description: Transacción no encontrada
+
+# DELETE /api/transactions/:id
+delete:
+  delete:
+    tags: [Transacciones]
+    summary: Eliminar transacción
+    description: |
+      Elimina una transacción. El balance y saldo del pocket
+      se recalculan automáticamente (son dinámicos).
+    operationId: deleteTransaction
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 3
+    responses:
+      "200":
+        description: Transacción eliminada
+        content:
+          application/json:
+            example:
+              success: true
+              message: "Transacción eliminada"
+      "404":
+        description: Transacción no encontrada

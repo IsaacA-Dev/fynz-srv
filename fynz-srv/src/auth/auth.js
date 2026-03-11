@@ -1,46 +1,53 @@
 import jwt from 'jsonwebtoken';
 
-const SECRET = process.env.JWT_SECRET || 'super_secret_key';
-const EXPIRES_IN = '7d';
-
-// Crear token
+/**
+ * Generar un JWT token para el usuario.
+ */
 export function generateToken(user) {
   return jwt.sign(
     {
       id: user.id,
-      email: user.email
+      email: user.email,
     },
-    SECRET,
-    { expiresIn: EXPIRES_IN }
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
   );
 }
 
-// Verificar token
+/**
+ * Verificar un JWT token.
+ */
 export function verifyToken(token) {
   try {
-    return jwt.verify(token, SECRET);
-  } catch (err) {
+    return jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
     return null;
   }
 }
 
-// Middleware para proteger rutas
+/**
+ * Middleware de autenticación para Fastify.
+ * Extrae el token del header Authorization y lo verifica.
+ */
 export async function authMiddleware(request, reply) {
   const authHeader = request.headers.authorization;
 
-  if (!authHeader) {
-    reply.code(401);
-    throw new Error('Token requerido');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return reply.code(401).send({
+      success: false,
+      message: 'Acceso denegado. Token requerido (Bearer <token>)',
+    });
   }
 
-  const token = authHeader.replace('Bearer ', '');
+  const token = authHeader.split(' ')[1];
   const decoded = verifyToken(token);
 
   if (!decoded) {
-    reply.code(401);
-    throw new Error('Token inválido o expirado');
+    return reply.code(401).send({
+      success: false,
+      message: 'Token inválido o expirado',
+    });
   }
 
-  // Adjuntamos el usuario al request
   request.user = decoded;
 }

@@ -1,0 +1,91 @@
+# ─────────────────────────────────────────────
+# Schema: Category
+# Modelo de categorías para clasificar transacciones
+# ─────────────────────────────────────────────
+
+Category:
+  type: object
+  description: >
+    Categoría para clasificar transacciones. Puede ser global del sistema
+    (is_default = 1) o personalizada por usuario (is_default = 0).
+  properties:
+    id:
+      type: integer
+      description: Identificador único de la categoría
+      example: 1
+    name:
+      type: string
+      description: Nombre de la categoría
+      maxLength: 50
+      example: "Alimentación"
+    icon:
+      type: string
+      description: Emoji o identificador de ícono para la UI
+      nullable: true
+      example: "🍔"
+    color:
+      type: string
+      pattern: "^#[0-9a-fA-F]{6}$"
+      description: Color hexadecimal para la UI
+      example: "#ef4444"
+    user_id:
+      type: integer
+      nullable: true
+      description: >
+        ID del usuario propietario. NULL para categorías globales del sistema.
+      example: null
+    is_default:
+      type: integer
+      enum: [0, 1]
+      description: >
+        1 = categoría del sistema (no editable/eliminable).
+        0 = categoría personalizada del usuario.
+      example: 1
+  required:
+    - id
+    - name
+
+# ─── Request Bodies ────────────────────────────
+
+CreateCategoryRequest:
+  type: object
+  description: Datos para crear una categoría personalizada
+  properties:
+    name:
+      type: string
+      description: Nombre de la categoría (1-50 caracteres)
+      minLength: 1
+      maxLength: 50
+      example: "Suscripciones"
+    icon:
+      type: string
+      description: Emoji o identificador de ícono
+      maxLength: 10
+      example: "📺"
+    color:
+      type: string
+      pattern: "^#[0-9a-fA-F]{6}$"
+      description: Color hexadecimal
+      example: "#7c3aed"
+  required:
+    - name
+
+UpdateCategoryRequest:
+  type: object
+  description: >
+    Datos para actualizar una categoría personalizada.
+    Se requiere al menos un campo.
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 50
+      example: "Streamings"
+    icon:
+      type: string
+      maxLength: 10
+      example: "🎬"
+    color:
+      type: string
+      pattern: "^#[0-9a-fA-F]{6}$"
+      example: "#a855f7"

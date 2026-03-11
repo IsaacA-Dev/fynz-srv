@@ -1,0 +1,1480 @@
+# ═══════════════════════════════════════════════════════════════
+#
+#   ███████╗██╗   ██╗███╗   ██╗███████╗     █████╗ ██████╗ ██╗
+#   ██╔════╝╚██╗ ██╔╝████╗  ██║╚══███╔╝    ██╔══██╗██╔══██╗██║
+#   █████╗   ╚████╔╝ ██╔██╗ ██║  ███╔╝     ███████║██████╔╝██║
+#   ██╔══╝    ╚██╔╝  ██║╚██╗██║ ███╔╝      ██╔══██║██╔═══╝ ██║
+#   ██║        ██║   ██║ ╚████║███████╗    ██║  ██║██║     ██║
+#   ╚═╝        ╚═╝   ╚═╝  ╚═══╝╚══════╝    ╚═╝  ╚═╝╚═╝     ╚═╝
+#
+#   Fynz API — Documentación OpenAPI 3.0
+#   Calculadora inteligente de gastos
+#
+# ═══════════════════════════════════════════════════════════════
+
+openapi: 3.0.3
+
+info:
+  title: Fynz API
+  version: 1.0.0
+  description: |
+    ## 💰 Fynz — Calculadora Inteligente de Gastos
+
+    API REST para la aplicación Fynz, un sistema de gestión financiera personal
+    que permite a los usuarios:
+
+    - **Registrar transacciones** (ingresos, gastos y transferencias)
+    - **Organizar dinero en bolsillos** de ahorro con metas
+    - **Clasificar movimientos** con categorías personalizables
+    - **Consultar resúmenes financieros** con desglose por categoría
+
+    ### Conceptos Clave
+
+    | Concepto | Descripción |
+    |----------|-------------|
+    | **Balance General** | Calculado dinámicamente: `SUM(income) - SUM(expense) - SUM(transfer)` |
+    | **Bolsillos (Pockets)** | Cuentas virtuales de ahorro con metas. Se alimentan con transacciones tipo `transfer` |
+    | **Categorías** | Clasificadores para transacciones. Hay 10 del sistema + personalizadas por usuario |
+    | **Tipos de Transacción** | `income` (ingreso), `expense` (gasto), `transfer` (transferencia a bolsillo) |
+
+    ### Autenticación
+
+    Todos los endpoints (excepto `/auth/register` y `/auth/login`) requieren un
+    **JWT token** en el header `Authorization`:
+
+    ```
+    Authorization: Bearer <token>
+    ```
+
+    El token se obtiene al hacer login y expira en 1 día (configurable).
+  contact:
+    name: Isaac — Fynz Dev
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000/api
+    description: Servidor de desarrollo local
+
+# ═══════════════════════════════════════════════════════════════
+# TAGS
+# ═══════════════════════════════════════════════════════════════
+
+tags:
+  - name: Autenticación
+    description: |
+      Registro de usuarios e inicio de sesión.
+      Estos endpoints **no requieren** token JWT.
+  - name: Usuarios
+    description: |
+      Perfil del usuario autenticado.
+      Incluye balance general calculado dinámicamente.
+  - name: Categorías
+    description: |
+      CRUD de categorías para clasificar transacciones.
+      El sistema incluye 10 categorías por defecto (no editables).
+      Los usuarios pueden crear categorías personalizadas.
+  - name: Bolsillos
+    description: |
+      CRUD de bolsillos de ahorro.
+      Cada bolsillo tiene una meta (`target_amount`) y un saldo
+      calculado dinámicamente (`current_amount`).
+  - name: Transacciones
+    description: |
+      Motor principal de Fynz. Registro, consulta y eliminación
+      de movimientos financieros con soporte para filtros y paginación.
+
+# ═══════════════════════════════════════════════════════════════
+# PATHS
+# ═══════════════════════════════════════════════════════════════
+
+paths:
+  # ─────────────────────────────────────────────────────────
+  # AUTH
+  # ─────────────────────────────────────────────────────────
+
+  /auth/register:
+    post:
+      tags: [Autenticación]
+      summary: Registrar nuevo usuario
+      description: |
+        Crea una cuenta nueva en Fynz. El email y username deben ser únicos.
+        El email se convierte automáticamente a minúsculas.
+        La contraseña se hashea con bcrypt antes de almacenarse.
+      operationId: registerUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            example:
+              email: "isaac@fynz.app"
+              username: "isaac"
+              password: "miPassword123"
+      responses:
+        "201":
+          description: Usuario creado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/UserPublic"
+              example:
+                success: true
+                message: "Usuario creado con éxito"
+                data:
+                  id: 1
+                  email: "isaac@fynz.app"
+                  username: "isaac"
+        "400":
+          description: Datos de registro inválidos (validación Zod)
+          content:
+            application/json:
+              example:
+                success: false
+                message: "Datos de registro inválidos"
+                errors:
+                  email:
+                    _errors: ["Email inválido"]
+        "409":
+          description: Email o username ya registrados
+          content:
+            application/json:
+              example:
+                success: false
+                message: "El email ya está registrado"
+
+  /auth/login:
+    post:
+      tags: [Autenticación]
+      summary: Iniciar sesión
+      description: |
+        Autentica al usuario con email y contraseña.
+        Devuelve un JWT token con expiración de 1 día (configurable).
+        El token debe enviarse en el header `Authorization: Bearer <token>`
+        para acceder a endpoints protegidos.
+      operationId: loginUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              email: "isaac@fynz.app"
+              password: "miPassword123"
+      responses:
+        "200":
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/LoginResponse"
+              example:
+                success: true
+                message: "Login correcto"
+                data:
+                  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  user:
+                    id: 1
+                    email: "isaac@fynz.app"
+                    username: "isaac"
+        "400":
+          description: Formato de datos incorrecto
+          content:
+            application/json:
+              example:
+                success: false
+                message: "Formato de datos incorrecto"
+        "401":
+          description: Credenciales inválidas
+          content:
+            application/json:
+              example:
+                success: false
+                message: "Credenciales inválidas"
+
+  # ─────────────────────────────────────────────────────────
+  # USERS
+  # ─────────────────────────────────────────────────────────
+
+  /users/me:
+    get:
+      tags: [Usuarios]
+      summary: Obtener perfil del usuario autenticado
+      description: |
+        Devuelve los datos del usuario autenticado junto con su balance
+        general calculado dinámicamente como:
+        `SUM(income) - SUM(expense) - SUM(transfer)`
+      operationId: getUserProfile
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Perfil del usuario con balance
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/UserProfile"
+              example:
+                success: true
+                data:
+                  id: 1
+                  username: "isaac"
+                  email: "isaac@fynz.app"
+                  created_at: "2026-03-10T23:00:00.000Z"
+                  balance: 14570.00
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+  # ─────────────────────────────────────────────────────────
+  # CATEGORIES
+  # ─────────────────────────────────────────────────────────
+
+  /categories:
+    get:
+      tags: [Categorías]
+      summary: Listar todas las categorías
+      description: |
+        Devuelve las categorías visibles para el usuario autenticado:
+        - **Categorías del sistema** (is_default = 1): Alimentación, Transporte, etc.
+        - **Categorías personalizadas** del usuario (is_default = 0)
+
+        Ordenadas alfabéticamente por nombre.
+      operationId: listCategories
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista de categorías
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Category"
+              example:
+                success: true
+                data:
+                  - id: 1
+                    name: "Alimentación"
+                    icon: "🍔"
+                    color: "#ef4444"
+                    user_id: null
+                    is_default: 1
+                  - id: 11
+                    name: "Suscripciones"
+                    icon: "📺"
+                    color: "#7c3aed"
+                    user_id: 1
+                    is_default: 0
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+    post:
+      tags: [Categorías]
+      summary: Crear categoría personalizada
+      description: |
+        Crea una nueva categoría personalizada para el usuario.
+        No se permite duplicar nombres de categorías del sistema ni propias.
+      operationId: createCategory
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCategoryRequest"
+            examples:
+              con_icono:
+                summary: Con ícono y color
+                value:
+                  name: "Suscripciones"
+                  icon: "📺"
+                  color: "#7c3aed"
+              solo_nombre:
+                summary: Solo nombre (color default)
+                value:
+                  name: "Mascotas"
+      responses:
+        "201":
+          description: Categoría creada
+          content:
+            application/json:
+              example:
+                success: true
+                message: "Categoría creada"
+                data:
+                  id: 11
+                  name: "Suscripciones"
+                  icon: "📺"
+                  color: "#7c3aed"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "409":
+          description: Ya existe una categoría con ese nombre
+          content:
+            application/json:
+              example:
+                success: false
+                message: "Ya existe una categoría con ese nombre"
+
+  /categories/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: ID de la categoría
+        schema:
+          type: integer
+          example: 11
+
+    put:
+      tags: [Categorías]
+      summary: Actualizar categoría personalizada
+      description: |
+        Actualiza una categoría personalizada del usuario.
+        **No se pueden editar categorías del sistema** (is_default = 1).
+        Se requiere al menos un campo para actualizar.
+      operationId: updateCategory
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCategoryRequest"
+            example:
+              name: "Streamings"
+              icon: "🎬"
+      responses:
+        "200":
+          description: Categoría actualizada
+          content:
+            application/json:
+              example:
+                success: true
+                message: "Categoría actualizada"
+                data:
+                  id: 11
+                  name: "Streamings"
+                  icon: "🎬"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          description: No tienes permiso (categoría del sistema o de otro usuario)
+          content:
+            application/json:
+              example:
+                success: false
+                message: "No puedes editar categorías del sistema"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+    delete:
+      tags: [Categorías]
+      summary: Eliminar categoría personalizada
+      description: |
+        Elimina una categoría personalizada del usuario.
+        **No se pueden eliminar categorías del sistema.**
+        Las transacciones asociadas conservarán category_id = NULL.
+      operationId: deleteCategory
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Categoría eliminada
+          content:
+            application/json:
+              example:
+                success: true
+                message: "Categoría eliminada"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          description: No tienes permiso para eliminar esta categoría
+          content:
+            application/json:
+              example:
+                success: false
+                message: "No puedes eliminar categorías del sistema"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  # ─────────────────────────────────────────────────────────
+  # POCKETS
+  # ─────────────────────────────────────────────────────────
+
+  /pockets:
+    get:
+      tags: [Bolsillos]
+      summary: Listar bolsillos del usuario
+      description: |
+        Devuelve todos los bolsillos del usuario autenticado con:
+        - **current_amount**: saldo calculado dinámicamente (SUM de transfers)
+        - **progress**: porcentaje de avance hacia la meta
+
+        Ordenados por fecha de creación (más recientes primero).
+      operationId: listPockets
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista de bolsillos con saldos calculados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Pocket"
+              example:
+                success: true
+                data:
+                  - id: 1
+                    name: "Vacaciones Cancún"
+                    target_amount: 25000.00
+                    current_amount: 8500.00
+                    color: "#3b82f6"
+                    icon: "🏖️"
+                    progress: 34.0
+                    user_id: 1
+                    created_at: "2026-03-10T23:00:00.000Z"
+                  - id: 2
+                    name: "Fondo de Emergencia"
+                    target_amount: 50000.00
+                    current_amount: 15000.00
+                    color: "#10b981"
+                    icon: "🛡️"
+                    progress: 30.0
+                    user_id: 1
+                    created_at: "2026-03-08T10:00:00.000Z"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+    post:
+      tags: [Bolsillos]
+      summary: Crear nuevo bolsillo
+      description: |
+        Crea un bolsillo de ahorro para organizar dinero por metas.
+        El saldo inicial siempre es 0 — se incrementa con transacciones
+        de tipo `transfer`.
+      operationId: createPocket
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePocketRequest"
+            examples:
+              con_meta:
+                summary: Con meta de ahorro
+                value:
+                  name: "Auto nuevo"
+                  target_amount: 180000.00
+                  color: "#f59e0b"
+                  icon: "🚗"
+              basico:
+                summary: Sin meta (solo organizar)
+                value:
+                  name: "Gastos compartidos"
+      responses:
+        "201":
+          description: Bolsillo creado
+          content:
+            application/json:
+              example:
+                success: true
+                message: "Bolsillo creado"
+                data:
+                  id: 1
+                  name: "Auto nuevo"
+                  target_amount: 180000.00
+                  color: "#f59e0b"
+                  icon: "🚗"
+                  current_amount: 0
+                  progress: 0
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+  /pockets/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: ID del bolsillo
+        schema:
+          type: integer
+          example: 1
+
+    get:
+      tags: [Bolsillos]
+      summary: Obtener un bolsillo por ID
+      description: |
+        Devuelve los detalles de un bolsillo específico del usuario,
+        incluyendo su saldo actual y progreso calculados dinámicamente.
+      operationId: getPocketById
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Detalle del bolsillo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Pocket"
+              example:
+                success: true
+                data:
+                  id: 1
+                  name: "Vacaciones Cancún"
+                  target_amount: 25000.00
+                  current_amount: 8500.00
+                  color: "#3b82f6"
+                  icon: "🏖️"
+                  progress: 34.0
+                  user_id: 1
+                  created_at: "2026-03-10T23:00:00.000Z"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+    put:
+      tags: [Bolsillos]
+      summary: Actualizar bolsillo
+      description: |
+        Actualiza los datos de un bolsillo existente.
+        Se requiere al menos un campo para actualizar.
+        **No modifica las transacciones asociadas.**
+      operationId: updatePocket
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePocketRequest"
+            example:
+              name: "Vacaciones Europa 2027"
+              target_amount: 60000.00
+      responses:
+        "200":
+          description: Bolsillo actualizado
+          content:
+            application/json:
+              example:
+                success: true
+                message: "Bolsillo actualizado"
+                data:
+                  id: 1
+                  name: "Vacaciones Europa 2027"
+                  target_amount: 60000.00
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+    delete:
+      tags: [Bolsillos]
+      summary: Eliminar bolsillo
+      description: |
+        Elimina un bolsillo del usuario. Las transacciones asociadas
+        conservarán su registro pero con pocket_id = NULL (ON DELETE SET NULL).
+      operationId: deletePocket
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Bolsillo eliminado
+          content:
+            application/json:
+              example:
+                success: true
+                message: "Bolsillo eliminado"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  # ─────────────────────────────────────────────────────────
+  # TRANSACTIONS
+  # ─────────────────────────────────────────────────────────
+
+  /transactions:
+    get:
+      tags: [Transacciones]
+      summary: Listar transacciones con filtros y paginación
+      description: |
+        Devuelve las transacciones del usuario autenticado con soporte para:
+        - **Filtrado** por tipo, categoría, bolsillo y rango de fechas
+        - **Paginación** con limit/offset
+
+        Ordenadas por fecha descendente (más recientes primero).
+      operationId: listTransactions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: false
+          description: Filtrar por tipo de transacción
+          schema:
+            type: string
+            enum: [income, expense, transfer]
+        - name: category_id
+          in: query
+          required: false
+          description: Filtrar por ID de categoría
+          schema:
+            type: integer
+        - name: pocket_id
+          in: query
+          required: false
+          description: Filtrar por ID de bolsillo
+          schema:
+            type: integer
+        - name: from
+          in: query
+          required: false
+          description: "Fecha inicio del rango (ISO 8601)"
+          schema:
+            type: string
+            format: date-time
+            example: "2026-03-01T00:00:00.000Z"
+        - name: to
+          in: query
+          required: false
+          description: "Fecha fin del rango (ISO 8601)"
+          schema:
+            type: string
+            format: date-time
+            example: "2026-03-31T23:59:59.000Z"
+        - name: limit
+          in: query
+          required: false
+          description: "Registros por página (1-100, default: 50)"
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          description: "Desplazamiento para paginación (default: 0)"
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Lista paginada de transacciones
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Transaction"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+              example:
+                success: true
+                data:
+                  - id: 3
+                    amount: 180.00
+                    description: "Pizza con amigos"
+                    type: "expense"
+                    pocket_id: null
+                    category_id: 1
+                    user_id: 1
+                    date: "2026-03-10T20:00:00.000Z"
+                    created_at: "2026-03-10T20:00:00.000Z"
+                  - id: 2
+                    amount: 250.00
+                    description: "Uber al trabajo"
+                    type: "expense"
+                    pocket_id: null
+                    category_id: 2
+                    user_id: 1
+                    date: "2026-03-10T15:30:00.000Z"
+                    created_at: "2026-03-10T15:30:00.000Z"
+                pagination:
+                  total: 147
+                  limit: 50
+                  offset: 0
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+    post:
+      tags: [Transacciones]
+      summary: Registrar nueva transacción
+      description: |
+        Crea un nuevo movimiento financiero. Reglas de negocio:
+
+        - **income**: Suma al balance general del usuario
+        - **expense**: Resta del balance general del usuario
+        - **transfer**: Resta del general y suma al bolsillo destino.
+          Requiere `pocket_id` obligatorio.
+
+        Validaciones:
+        - `amount` debe ser mayor a 0
+        - Si se envía `pocket_id`, debe existir y pertenecer al usuario
+        - Si se envía `category_id`, debe ser accesible para el usuario
+        - Si `type = 'transfer'`, `pocket_id` es **obligatorio**
+      operationId: createTransaction
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTransactionRequest"
+            examples:
+              ingreso:
+                summary: "💰 Registrar ingreso (nómina)"
+                value:
+                  amount: 15000.00
+                  description: "Nómina quincenal"
+                  type: "income"
+                  category_id: 9
+              gasto:
+                summary: "💸 Registrar gasto"
+                value:
+                  amount: 250.00
+                  description: "Uber al trabajo"
+                  type: "expense"
+                  category_id: 2
+              transferencia:
+                summary: "🏦 Transferir a bolsillo"
+                value:
+                  amount: 3000.00
+                  description: "Ahorro quincenal"
+                  type: "transfer"
+                  pocket_id: 1
+              gasto_con_fecha:
+                summary: "📅 Gasto con fecha personalizada"
+                value:
+                  amount: 180.00
+                  description: "Pizza con amigos"
+                  type: "expense"
+                  category_id: 1
+                  date: "2026-03-08T20:00:00.000Z"
+      responses:
+        "201":
+          description: Transacción registrada
+          content:
+            application/json:
+              example:
+                success: true
+                message: "Transacción registrada"
+                data:
+                  id: 1
+                  amount: 250.00
+                  description: "Uber al trabajo"
+                  type: "expense"
+                  pocket_id: null
+                  category_id: 2
+        "400":
+          description: |
+            Datos inválidos. Posibles errores:
+            - Monto no es positivo
+            - Tipo inválido
+            - Transfer sin pocket_id
+          content:
+            application/json:
+              examples:
+                sin_pocket:
+                  summary: Transfer sin pocket_id
+                  value:
+                    success: false
+                    message: "Las transferencias requieren un bolsillo destino (pocket_id)"
+                tipo_invalido:
+                  summary: Tipo inválido
+                  value:
+                    success: false
+                    message: "Datos inválidos"
+                    errors:
+                      type:
+                        _errors: ["Tipo debe ser: income, expense o transfer"]
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          description: Pocket o categoría no encontrada
+          content:
+            application/json:
+              example:
+                success: false
+                message: "Bolsillo no encontrado o no te pertenece"
+
+  /transactions/summary:
+    get:
+      tags: [Transacciones]
+      summary: Obtener resumen financiero
+      description: |
+        Devuelve un resumen completo de las finanzas del usuario:
+        - **Totales**: ingreso, gasto, transferencias, balance
+        - **Desglose**: gastos agrupados por categoría (mayor a menor)
+
+        Útil para el dashboard principal de la aplicación.
+      operationId: getTransactionSummary
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Resumen financiero
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/TransactionSummary"
+              example:
+                success: true
+                data:
+                  income: 30000.00
+                  expense: 12450.00
+                  transfer: 5000.00
+                  balance: 12550.00
+                  expenses_by_category:
+                    - category_name: "Alimentación"
+                      category_icon: "🍔"
+                      category_color: "#ef4444"
+                      total: 4500.00
+                    - category_name: "Transporte"
+                      category_icon: "🚗"
+                      category_color: "#f59e0b"
+                      total: 3200.00
+                    - category_name: "Entretenimiento"
+                      category_icon: "🎬"
+                      category_color: "#8b5cf6"
+                      total: 2100.00
+                    - category_name: "Servicios"
+                      category_icon: "📱"
+                      category_color: "#ec4899"
+                      total: 1650.00
+                    - category_name: "Personal"
+                      category_icon: "👤"
+                      category_color: "#14b8a6"
+                      total: 1000.00
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+  /transactions/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: ID de la transacción
+        schema:
+          type: integer
+          example: 1
+
+    get:
+      tags: [Transacciones]
+      summary: Obtener una transacción por ID
+      description: Devuelve los detalles de una transacción específica del usuario.
+      operationId: getTransactionById
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Detalle de la transacción
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Transaction"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+    delete:
+      tags: [Transacciones]
+      summary: Eliminar transacción
+      description: |
+        Elimina una transacción del usuario. Esto afecta automáticamente
+        el balance general y el saldo del pocket (si aplica), ya que
+        ambos se calculan dinámicamente.
+      operationId: deleteTransaction
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Transacción eliminada
+          content:
+            application/json:
+              example:
+                success: true
+                message: "Transacción eliminada"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+# ═══════════════════════════════════════════════════════════════
+# COMPONENTS
+# ═══════════════════════════════════════════════════════════════
+
+components:
+  # ─── Seguridad ──────────────────────────────────────────
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Token JWT obtenido del endpoint `/auth/login`.
+        Header: `Authorization: Bearer <token>`
+
+  # ─── Schemas ────────────────────────────────────────────
+  schemas:
+    # ─── User ─────────────────────────────────────────────
+    User:
+      type: object
+      description: Usuario registrado en Fynz
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          minLength: 3
+          maxLength: 20
+          example: "isaac"
+        email:
+          type: string
+          format: email
+          example: "isaac@fynz.app"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-03-10T23:00:00.000Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-03-10T23:00:00.000Z"
+      required: [id, username, email]
+
+    UserProfile:
+      type: object
+      description: Perfil del usuario con balance calculado dinámicamente
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          properties:
+            balance:
+              type: number
+              format: double
+              description: "Balance = SUM(income) - SUM(expense) - SUM(transfer)"
+              example: 14570.00
+
+    UserPublic:
+      type: object
+      description: Datos públicos del usuario (sin info sensible)
+      properties:
+        id:
+          type: integer
+          example: 1
+        email:
+          type: string
+          format: email
+          example: "isaac@fynz.app"
+        username:
+          type: string
+          example: "isaac"
+
+    RegisterRequest:
+      type: object
+      description: Datos para registrar un nuevo usuario
+      properties:
+        email:
+          type: string
+          format: email
+          example: "isaac@fynz.app"
+        username:
+          type: string
+          minLength: 3
+          maxLength: 20
+          example: "isaac"
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: "miPassword123"
+      required: [email, username, password]
+
+    LoginRequest:
+      type: object
+      description: Credenciales para iniciar sesión
+      properties:
+        email:
+          type: string
+          format: email
+          example: "isaac@fynz.app"
+        password:
+          type: string
+          format: password
+          example: "miPassword123"
+      required: [email, password]
+
+    LoginResponse:
+      type: object
+      description: Respuesta exitosa del login
+      properties:
+        token:
+          type: string
+          description: JWT token para autenticación
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        user:
+          $ref: "#/components/schemas/UserPublic"
+
+    # ─── Category ─────────────────────────────────────────
+    Category:
+      type: object
+      description: |
+        Categoría para clasificar transacciones.
+        is_default = 1: categoría del sistema (no editable).
+        is_default = 0: categoría personalizada del usuario.
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          maxLength: 50
+          example: "Alimentación"
+        icon:
+          type: string
+          nullable: true
+          example: "🍔"
+        color:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+          example: "#ef4444"
+        user_id:
+          type: integer
+          nullable: true
+          description: "NULL = categoría global del sistema"
+          example: null
+        is_default:
+          type: integer
+          enum: [0, 1]
+          description: "1 = sistema (no editable), 0 = personalizada"
+          example: 1
+      required: [id, name]
+
+    CreateCategoryRequest:
+      type: object
+      description: Datos para crear una categoría personalizada
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+          example: "Suscripciones"
+        icon:
+          type: string
+          maxLength: 10
+          example: "📺"
+        color:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+          example: "#7c3aed"
+      required: [name]
+
+    UpdateCategoryRequest:
+      type: object
+      description: Datos para actualizar categoría (mínimo 1 campo)
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+          example: "Streamings"
+        icon:
+          type: string
+          maxLength: 10
+          example: "🎬"
+        color:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+          example: "#a855f7"
+
+    # ─── Pocket ───────────────────────────────────────────
+    Pocket:
+      type: object
+      description: |
+        Bolsillo de ahorro con meta.
+        current_amount y progress se calculan dinámicamente (no se almacenan).
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          maxLength: 50
+          example: "Vacaciones Cancún"
+        target_amount:
+          type: number
+          format: double
+          minimum: 0
+          description: Meta de ahorro en pesos
+          example: 25000.00
+        current_amount:
+          type: number
+          format: double
+          readOnly: true
+          description: "Saldo = SUM(transactions WHERE pocket_id = this.id AND type = 'transfer')"
+          example: 8500.00
+        color:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+          example: "#3b82f6"
+        icon:
+          type: string
+          nullable: true
+          example: "🏖️"
+        progress:
+          type: number
+          format: double
+          readOnly: true
+          minimum: 0
+          maximum: 100
+          description: "(current_amount / target_amount) * 100"
+          example: 34.0
+        user_id:
+          type: integer
+          example: 1
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-03-10T23:00:00.000Z"
+      required: [id, name, user_id]
+
+    CreatePocketRequest:
+      type: object
+      description: Datos para crear un nuevo bolsillo
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+          example: "Fondo de Emergencia"
+        target_amount:
+          type: number
+          format: double
+          minimum: 0
+          default: 0
+          example: 50000.00
+        color:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+          example: "#10b981"
+        icon:
+          type: string
+          maxLength: 10
+          example: "🛡️"
+      required: [name]
+
+    UpdatePocketRequest:
+      type: object
+      description: Datos para actualizar bolsillo (mínimo 1 campo)
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+          example: "Fondo de Emergencia 2026"
+        target_amount:
+          type: number
+          format: double
+          minimum: 0
+          example: 75000.00
+        color:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+          example: "#059669"
+        icon:
+          type: string
+          maxLength: 10
+          example: "💰"
+
+    # ─── Transaction ──────────────────────────────────────
+    Transaction:
+      type: object
+      description: |
+        Movimiento financiero.
+        - income: suma al balance general
+        - expense: resta del balance general
+        - transfer: resta del general, suma al pocket
+      properties:
+        id:
+          type: integer
+          example: 1
+        amount:
+          type: number
+          format: double
+          minimum: 0.01
+          example: 250.00
+        description:
+          type: string
+          nullable: true
+          maxLength: 200
+          example: "Uber al trabajo"
+        type:
+          type: string
+          enum: [income, expense, transfer]
+          example: "expense"
+        pocket_id:
+          type: integer
+          nullable: true
+          description: "Obligatorio si type = 'transfer'"
+          example: null
+        category_id:
+          type: integer
+          nullable: true
+          example: 2
+        user_id:
+          type: integer
+          example: 1
+        date:
+          type: string
+          format: date-time
+          example: "2026-03-10T15:30:00.000Z"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-03-10T23:00:00.000Z"
+      required: [id, amount, type, user_id]
+
+    CreateTransactionRequest:
+      type: object
+      description: |
+        Datos para registrar transacción.
+        Si type = 'transfer', pocket_id es obligatorio.
+      properties:
+        amount:
+          type: number
+          format: double
+          minimum: 0.01
+          example: 250.00
+        description:
+          type: string
+          maxLength: 200
+          example: "Uber al trabajo"
+        type:
+          type: string
+          enum: [income, expense, transfer]
+          example: "expense"
+        pocket_id:
+          type: integer
+          nullable: true
+          description: "Obligatorio si type = 'transfer'"
+          example: null
+        category_id:
+          type: integer
+          nullable: true
+          example: 2
+        date:
+          type: string
+          format: date-time
+          description: "Fecha personalizada (ISO 8601). Default: ahora"
+          example: "2026-03-10T15:30:00.000Z"
+      required: [amount, type]
+
+    TransactionSummary:
+      type: object
+      description: Resumen financiero con totales y desglose por categoría
+      properties:
+        income:
+          type: number
+          format: double
+          example: 30000.00
+        expense:
+          type: number
+          format: double
+          example: 12450.00
+        transfer:
+          type: number
+          format: double
+          example: 5000.00
+        balance:
+          type: number
+          format: double
+          description: "income - expense - transfer"
+          example: 12550.00
+        expenses_by_category:
+          type: array
+          description: Gastos agrupados por categoría (mayor a menor)
+          items:
+            type: object
+            properties:
+              category_name:
+                type: string
+                example: "Alimentación"
+              category_icon:
+                type: string
+                example: "🍔"
+              category_color:
+                type: string
+                example: "#ef4444"
+              total:
+                type: number
+                format: double
+                example: 4500.00
+
+    Pagination:
+      type: object
+      description: Metadatos de paginación
+      properties:
+        total:
+          type: integer
+          description: Total de registros
+          example: 147
+        limit:
+          type: integer
+          example: 50
+        offset:
+          type: integer
+          example: 0
+
+    # ─── Respuestas comunes ───────────────────────────────
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Recurso no encontrado"
+
+    ErrorValidation:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Datos inválidos"
+        errors:
+          type: object
+          description: Errores por campo (formato Zod)
+          additionalProperties:
+            type: object
+            properties:
+              _errors:
+                type: array
+                items:
+                  type: string
+
+  # ─── Respuestas reutilizables ───────────────────────────
+  responses:
+    UnauthorizedError:
+      description: Token JWT faltante, inválido o expirado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            message: "Token inválido o expirado"
+
+    NotFoundError:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            message: "Recurso no encontrado"
+
+    ValidationError:
+      description: Error de validación de datos
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorValidation"
+
+    ForbiddenError:
+      description: No tienes permiso para esta acción
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            message: "No tienes permiso para esta acción"
+
+# ═══════════════════════════════════════════════════════════════
+# Seguridad global
+# ═══════════════════════════════════════════════════════════════
+security:
+  - BearerAuth: []

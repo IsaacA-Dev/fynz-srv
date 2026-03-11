@@ -1,23 +1,47 @@
 import Fastify from 'fastify';
 import * as dotenv from 'dotenv';
+import { corsPlugin } from './plugins/cors.js';
+import { errorHandlerPlugin } from './errors/AppError.js';
 import { initDatabase } from './database/init.js';
-import { setupRoutes } from './routes/setup.js'; // <-- Importar
+import { registerRoutes } from './routes/index.js';
 
 dotenv.config();
-const fastify = Fastify({ logger: true });
 
-await initDatabase();
-
-// Registrar las rutas
-fastify.register(setupRoutes);
-
-fastify.get('/health', async () => {
-  return { status: 'ok', service: 'fynz-srv' };
+const fastify = Fastify({
+  logger: {
+    level: 'warn',
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        translateTime: 'HH:MM:ss',
+        ignore: 'pid,hostname',
+        colorize: true,
+      },
+    },
+  },
 });
 
+// ─── Plugins ────────────────────────────────────────────
+await fastify.register(corsPlugin);
+fastify.register(errorHandlerPlugin);
+
+// ─── Base de datos ──────────────────────────────────────
+await initDatabase();
+
+// ─── Rutas ──────────────────────────────────────────────
+await fastify.register(registerRoutes);
+
+// ─── Health check ───────────────────────────────────────
+fastify.get('/health', async () => {
+  return { status: 'ok', service: 'fynz-srv', timestamp: new Date().toISOString() };
+});
+
+// ─── Arrancar servidor ──────────────────────────────────
 const start = async () => {
   try {
-    await fastify.listen({ port: process.env.PORT || 3000, host: '0.0.0.0' });
+    const port = process.env.PORT || 3000;
+    await fastify.listen({ port, host: '0.0.0.0' });
+    console.log(`🚀 Fynz API corriendo en http://localhost:${port}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

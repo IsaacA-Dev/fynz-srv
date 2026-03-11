@@ -1,0 +1,157 @@
+# ─────────────────────────────────────────────
+# Paths: Categories
+# CRUD de categorías para clasificar transacciones
+# Requieren JWT (Bearer token)
+#
+# Archivo de referencia por modelo.
+# La spec completa está en: ../openapi.yaml
+# ─────────────────────────────────────────────
+
+# GET /api/categories
+list:
+  get:
+    tags: [Categorías]
+    summary: Listar todas las categorías
+    description: |
+      Devuelve las categorías visibles para el usuario:
+      - Categorías del sistema (is_default = 1)
+      - Categorías personalizadas del usuario (is_default = 0)
+      Ordenadas alfabéticamente.
+    operationId: listCategories
+    responses:
+      "200":
+        description: Lista de categorías
+        content:
+          application/json:
+            example:
+              success: true
+              data:
+                - id: 1
+                  name: "Alimentación"
+                  icon: "🍔"
+                  color: "#ef4444"
+                  user_id: null
+                  is_default: 1
+                - id: 11
+                  name: "Suscripciones"
+                  icon: "📺"
+                  color: "#7c3aed"
+                  user_id: 1
+                  is_default: 0
+
+# POST /api/categories
+create:
+  post:
+    tags: [Categorías]
+    summary: Crear categoría personalizada
+    description: |
+      Crea una nueva categoría para el usuario.
+      No se permite duplicar nombres de categorías del sistema ni propias.
+    operationId: createCategory
+    requestBody:
+      required: true
+      content:
+        application/json:
+          examples:
+            con_icono:
+              summary: Con ícono y color
+              value:
+                name: "Suscripciones"
+                icon: "📺"
+                color: "#7c3aed"
+            solo_nombre:
+              summary: Solo nombre
+              value:
+                name: "Mascotas"
+    responses:
+      "201":
+        description: Categoría creada
+        content:
+          application/json:
+            example:
+              success: true
+              message: "Categoría creada"
+              data:
+                id: 11
+                name: "Suscripciones"
+                icon: "📺"
+                color: "#7c3aed"
+      "409":
+        description: Ya existe una categoría con ese nombre
+        content:
+          application/json:
+            example:
+              success: false
+              message: "Ya existe una categoría con ese nombre"
+
+# PUT /api/categories/:id
+update:
+  put:
+    tags: [Categorías]
+    summary: Actualizar categoría personalizada
+    description: |
+      Actualiza una categoría personalizada del usuario.
+      No se pueden editar categorías del sistema (is_default = 1).
+    operationId: updateCategory
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 11
+    requestBody:
+      required: true
+      content:
+        application/json:
+          example:
+            name: "Streamings"
+            icon: "🎬"
+    responses:
+      "200":
+        description: Categoría actualizada
+        content:
+          application/json:
+            example:
+              success: true
+              message: "Categoría actualizada"
+              data: { id: 11, name: "Streamings", icon: "🎬" }
+      "403":
+        description: No se puede editar categoría del sistema
+        content:
+          application/json:
+            example:
+              success: false
+              message: "No puedes editar categorías del sistema"
+      "404":
+        description: Categoría no encontrada
+
+# DELETE /api/categories/:id
+delete:
+  delete:
+    tags: [Categorías]
+    summary: Eliminar categoría personalizada
+    description: |
+      Elimina una categoría personalizada.
+      No se pueden eliminar categorías del sistema.
+      Transacciones asociadas quedan con category_id = NULL.
+    operationId: deleteCategory
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 11
+    responses:
+      "200":
+        description: Categoría eliminada
+        content:
+          application/json:
+            example:
+              success: true
+              message: "Categoría eliminada"
+      "403":
+        description: No se puede eliminar categoría del sistema
+      "404":
+        description: Categoría no encontrada

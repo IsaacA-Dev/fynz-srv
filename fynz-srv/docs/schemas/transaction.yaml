@@ -1,0 +1,229 @@
+# ─────────────────────────────────────────────
+# Schema: Transaction
+# Modelo de transacciones — el motor principal de Fynz
+# ─────────────────────────────────────────────
+
+Transaction:
+  type: object
+  description: >
+    Registro de movimiento financiero. Tipos soportados:
+    - **income**: Ingreso (suma al balance general)
+    - **expense**: Gasto (resta del balance general)
+    - **transfer**: Transferencia a un bolsillo (resta del general, suma al pocket)
+  properties:
+    id:
+      type: integer
+      description: Identificador único de la transacción
+      example: 1
+    amount:
+      type: number
+      format: double
+      description: Monto de la transacción (siempre positivo)
+      minimum: 0.01
+      example: 250.00
+    description:
+      type: string
+      nullable: true
+      description: Descripción opcional del movimiento
+      maxLength: 200
+      example: "Uber al trabajo"
+    type:
+      type: string
+      enum:
+        - income
+        - expense
+        - transfer
+      description: >
+        Tipo de transacción:
+        - `income` → Ingreso (nómina, freelance, venta, etc.)
+        - `expense` → Gasto (comida, transporte, servicios, etc.)
+        - `transfer` → Transferencia a un bolsillo de ahorro
+      example: "expense"
+    pocket_id:
+      type: integer
+      nullable: true
+      description: >
+        ID del bolsillo destino. Obligatorio cuando type = 'transfer'.
+        NULL para income/expense que afectan el balance general.
+      example: null
+    category_id:
+      type: integer
+      nullable: true
+      description: ID de la categoría que clasifica esta transacción
+      example: 2
+    user_id:
+      type: integer
+      description: ID del usuario propietario
+      example: 1
+    date:
+      type: string
+      format: date-time
+      description: Fecha del movimiento (default CURRENT_TIMESTAMP)
+      example: "2026-03-10T15:30:00.000Z"
+    created_at:
+      type: string
+      format: date-time
+      description: Fecha de registro en el sistema
+      example: "2026-03-10T23:00:00.000Z"
+  required:
+    - id
+    - amount
+    - type
+    - user_id
+
+# ─── Request Bodies ────────────────────────────
+
+CreateTransactionRequest:
+  type: object
+  description: >
+    Datos para registrar una nueva transacción.
+    Si type = 'transfer', pocket_id es obligatorio.
+  properties:
+    amount:
+      type: number
+      format: double
+      description: Monto del movimiento (debe ser mayor a 0)
+      minimum: 0.01
+      example: 250.00
+    description:
+      type: string
+      description: Descripción opcional (máx 200 caracteres)
+      maxLength: 200
+      example: "Uber al trabajo"
+    type:
+      type: string
+      enum:
+        - income
+        - expense
+        - transfer
+      description: Tipo de transacción
+      example: "expense"
+    pocket_id:
+      type: integer
+      nullable: true
+      description: >
+        ID del bolsillo destino (obligatorio si type = 'transfer')
+      example: null
+    category_id:
+      type: integer
+      nullable: true
+      description: ID de la categoría
+      example: 2
+    date:
+      type: string
+      format: date-time
+      description: >
+        Fecha personalizada del movimiento (ISO 8601).
+        Si no se envía, se usa la fecha actual.
+      example: "2026-03-10T15:30:00.000Z"
+  required:
+    - amount
+    - type
+
+# ─── Query Filters ─────────────────────────────
+
+TransactionFilters:
+  type: object
+  description: Filtros opcionales para listar transacciones
+  properties:
+    type:
+      type: string
+      enum:
+        - income
+        - expense
+        - transfer
+      description: Filtrar por tipo de transacción
+    category_id:
+      type: integer
+      description: Filtrar por categoría
+    pocket_id:
+      type: integer
+      description: Filtrar por bolsillo
+    from:
+      type: string
+      format: date-time
+      description: Fecha inicio del rango (inclusive)
+      example: "2026-03-01T00:00:00.000Z"
+    to:
+      type: string
+      format: date-time
+      description: Fecha fin del rango (inclusive)
+      example: "2026-03-31T23:59:59.000Z"
+    limit:
+      type: integer
+      description: Cantidad de resultados por página
+      minimum: 1
+      maximum: 100
+      default: 50
+      example: 20
+    offset:
+      type: integer
+      description: Desplazamiento para paginación
+      minimum: 0
+      default: 0
+      example: 0
+
+# ─── Response Types ────────────────────────────
+
+TransactionSummary:
+  type: object
+  description: >
+    Resumen financiero del usuario con totales por tipo
+    y desglose de gastos por categoría.
+  properties:
+    income:
+      type: number
+      format: double
+      description: Total de ingresos
+      example: 30000.00
+    expense:
+      type: number
+      format: double
+      description: Total de gastos
+      example: 12450.00
+    transfer:
+      type: number
+      format: double
+      description: Total transferido a bolsillos
+      example: 5000.00
+    balance:
+      type: number
+      format: double
+      description: "Balance = income - expense - transfer"
+      example: 12550.00
+    expenses_by_category:
+      type: array
+      description: Desglose de gastos agrupados por categoría (ordenados de mayor a menor)
+      items:
+        type: object
+        properties:
+          category_name:
+            type: string
+            example: "Alimentación"
+          category_icon:
+            type: string
+            example: "🍔"
+          category_color:
+            type: string
+            example: "#ef4444"
+          total:
+            type: number
+            format: double
+            example: 4500.00
+
+Pagination:
+  type: object
+  description: Metadatos de paginación
+  properties:
+    total:
+      type: integer
+      description: Total de registros disponibles
+      example: 147
+    limit:
+      type: integer
+      description: Límite de registros por página
+      example: 50
+    offset:
+      type: integer
+      description: Desplazamiento actual
+      example: 0
