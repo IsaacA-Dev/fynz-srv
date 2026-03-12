@@ -7,11 +7,22 @@ import cors from '@fastify/cors';
 export async function corsPlugin(fastify) {
     const originEnv = process.env.CORS_ORIGIN;
 
-    // Si no hay variable (dev), permitimos todo (true)
-    // Si hay, limpiamos cada origen para evitar errores de coincidencia (espacios y barras finales)
-    const origin = originEnv
-        ? originEnv.split(',').map(o => o.trim().replace(/\/$/, ''))
-        : true;
+    // Orígenes permitidos por defecto (desarrollo y producción)
+    const allowedOrigins = [
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'https://isaaca-dev.github.io'
+    ];
+
+    let origin;
+    if (originEnv) {
+        // Combinamos los orígenes de entorno con los permitidos por defecto
+        const envOrigins = originEnv.split(',').map(o => o.trim().replace(/\/$/, ''));
+        origin = [...new Set([...envOrigins, ...allowedOrigins])];
+    } else {
+        // En desarrollo si no hay variable, permitimos todo
+        origin = true;
+    }
 
     console.log(`📡 CORS configurado para: ${origin === true ? '*' : origin.join(', ')}`);
 
