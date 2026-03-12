@@ -105,6 +105,7 @@ export async function initDatabase() {
       { name: 'Hogar', icon: '🏠', color: '#6366f1', is_default: true },
       { name: 'Servicios', icon: '📱', color: '#ec4899', is_default: true },
       { name: 'Personal', icon: '👤', color: '#14b8a6', is_default: true },
+      { name: 'Ahorro', icon: '💰', color: '#16a34a', is_default: true },
       { name: 'Inversión', icon: '📈', color: '#22c55e', is_default: true },
       { name: 'Otros', icon: '📦', color: '#64748b', is_default: true },
     ];

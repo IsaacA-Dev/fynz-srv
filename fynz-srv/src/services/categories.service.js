@@ -52,7 +52,7 @@ export class CategoriesService {
                 user_id: userId,
                 is_default: false,
             })
-            .returning(['id', 'name', 'icon', 'color'])
+            .returning(['id', 'name', 'icon', 'color', 'user_id', 'is_default'])
             .executeTakeFirstOrThrow();
 
         return result;
