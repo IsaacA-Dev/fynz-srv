@@ -80,7 +80,7 @@ export class UsersService {
      */
     static async getProfile(userId) {
         const user = await db.selectFrom('users')
-            .select(['id', 'username', 'email', 'created_at'])
+            .select(['id', 'username', 'email', 'role', 'created_at'])
             .where('id', '=', userId)
             .executeTakeFirst();
 
